@@ -114,6 +114,13 @@ public class ServerApp extends JFrame {
     private JLabel fpsLabel;
     private JCheckBox remoteControlToggle;
     private JButton disconnectClientButton;
+    private JButton focusViewButton;
+    private JButton aspectRatioButton;
+    private JSplitPane mainSplitPane;
+
+    // --- High-Performance Mouse Throttling Engine ---
+    private final java.util.concurrent.atomic.AtomicLong lastMouseMoveTime = new java.util.concurrent.atomic.AtomicLong(0);
+    private static final long MOUSE_MOVE_THROTTLE_MS = 10; // Max 100 packets/sec for zero lag and silky smooth cursor
 
     // --- Thread Management ---
     private final ExecutorService networkExecutor = Executors.newCachedThreadPool();
@@ -233,8 +240,28 @@ public class ServerApp extends JFrame {
         leftStatusPanel.add(resolutionLabel);
         leftStatusPanel.add(fpsLabel);
 
-        JPanel rightControlPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        JPanel rightControlPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         rightControlPanel.setOpaque(false);
+
+        aspectRatioButton = new JButton("16:9 Fit");
+        aspectRatioButton.setFont(new Font("SansSerif", Font.BOLD, 11));
+        aspectRatioButton.setBackground(new Color(63, 63, 70));
+        aspectRatioButton.setForeground(Color.WHITE);
+        aspectRatioButton.setFocusPainted(false);
+        aspectRatioButton.setToolTipText("Toggle between aspect-ratio letterboxing and full stretch");
+        aspectRatioButton.addActionListener(e -> {
+            boolean current = screenCanvas.isFitAspectRatio();
+            screenCanvas.setFitAspectRatio(!current);
+            aspectRatioButton.setText(!current ? "16:9 Fit" : "Stretch");
+        });
+
+        focusViewButton = new JButton("⛶ Focus Screen");
+        focusViewButton.setFont(new Font("SansSerif", Font.BOLD, 11));
+        focusViewButton.setBackground(new Color(63, 63, 70));
+        focusViewButton.setForeground(Color.WHITE);
+        focusViewButton.setFocusPainted(false);
+        focusViewButton.setToolTipText("Toggle Full Screen remote display focus");
+        focusViewButton.addActionListener(e -> toggleFocusView());
 
         remoteControlToggle = new JCheckBox("Remote Control Active", remoteControlEnabled);
         remoteControlToggle.setOpaque(false);
@@ -254,6 +281,8 @@ public class ServerApp extends JFrame {
         disconnectClientButton.setEnabled(false);
         disconnectClientButton.addActionListener(e -> disconnectCurrentClient());
 
+        rightControlPanel.add(aspectRatioButton);
+        rightControlPanel.add(focusViewButton);
         rightControlPanel.add(remoteControlToggle);
         rightControlPanel.add(disconnectClientButton);
 
@@ -274,12 +303,12 @@ public class ServerApp extends JFrame {
         // Chat Panel
         JPanel chatPanel = createChatPanel(panelDark, borderDark, textLight, accentBlue);
 
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, screenCanvas, chatPanel);
-        splitPane.setResizeWeight(0.72); // 72% screen, 28% chat
-        splitPane.setDividerSize(4);
-        splitPane.setBorder(null);
-        splitPane.setBackground(borderDark);
-        add(splitPane, BorderLayout.CENTER);
+        mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, screenCanvas, chatPanel);
+        mainSplitPane.setResizeWeight(0.72); // 72% screen, 28% chat
+        mainSplitPane.setDividerSize(4);
+        mainSplitPane.setBorder(null);
+        mainSplitPane.setBackground(borderDark);
+        add(mainSplitPane, BorderLayout.CENTER);
 
         // Graceful Window Close
         addWindowListener(new WindowAdapter() {
@@ -305,7 +334,17 @@ public class ServerApp extends JFrame {
         JLabel chatTitle = new JLabel("Full-Duplex Chat (Port 5000)");
         chatTitle.setFont(new Font("SansSerif", Font.BOLD, 13));
         chatTitle.setForeground(textLight);
+
+        JButton clearChatBtn = new JButton("Clear Log");
+        clearChatBtn.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        clearChatBtn.setBackground(new Color(63, 63, 70));
+        clearChatBtn.setForeground(Color.LIGHT_GRAY);
+        clearChatBtn.setFocusPainted(false);
+        clearChatBtn.setBorder(new EmptyBorder(2, 8, 2, 8));
+        clearChatBtn.addActionListener(e -> chatLogArea.setText(""));
+
         chatHeader.add(chatTitle, BorderLayout.WEST);
+        chatHeader.add(clearChatBtn, BorderLayout.EAST);
         chatPanel.add(chatHeader, BorderLayout.NORTH);
 
         // Chat History Log Area
@@ -393,16 +432,24 @@ public class ServerApp extends JFrame {
             }
         });
 
-        // Mouse Motion (Moves and Drags)
+        // Mouse Motion (Moves and Drags) with Throttle Pacing for zero lag
         screenCanvas.addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
-                processAndSendMouseMove(e.getX(), e.getY());
+                long now = System.currentTimeMillis();
+                if (now - lastMouseMoveTime.get() >= MOUSE_MOVE_THROTTLE_MS) {
+                    lastMouseMoveTime.set(now);
+                    processAndSendMouseMove(e.getX(), e.getY());
+                }
             }
 
             @Override
             public void mouseDragged(MouseEvent e) {
-                processAndSendMouseMove(e.getX(), e.getY());
+                long now = System.currentTimeMillis();
+                if (now - lastMouseMoveTime.get() >= MOUSE_MOVE_THROTTLE_MS) {
+                    lastMouseMoveTime.set(now);
+                    processAndSendMouseMove(e.getX(), e.getY());
+                }
             }
         });
 
@@ -450,30 +497,34 @@ public class ServerApp extends JFrame {
     }
 
     /**
+     * Toggles between standard split layout and Focus Screen mode.
+     */
+    private void toggleFocusView() {
+        if (mainSplitPane == null) return;
+        int totalWidth = mainSplitPane.getWidth();
+        if (totalWidth <= 0) return;
+        int currentDiv = mainSplitPane.getDividerLocation();
+        if (currentDiv > totalWidth * 0.90) {
+            mainSplitPane.setDividerLocation(0.72);
+            focusViewButton.setText("⛶ Focus Screen");
+        } else {
+            mainSplitPane.setDividerLocation(1.0);
+            focusViewButton.setText("◫ Split View");
+        }
+    }
+
+    /**
      * PROPORTIONAL COORDINATE SCALING ENGINE:
-     * Calculates the exact proportional coordinates from Server viewport to Client display:
-     *   ClientX = (ServerEventX * ClientNativeWidth) / ServerPanelWidth
-     *   ClientY = (ServerEventY * ClientNativeHeight) / ServerPanelHeight
+     * Calculates the exact proportional coordinates from Server viewport to Client display.
+     * Uses letterbox boundary translation for pixel-perfect precision.
      */
     private void processAndSendMouseMove(int eventX, int eventY) {
         if (!remoteControlEnabled || !isClientConnected.get()) return;
 
-        int panelW = screenCanvas.getWidth();
-        int panelH = screenCanvas.getHeight();
-
-        if (panelW <= 0 || panelH <= 0 || clientNativeWidth <= 0 || clientNativeHeight <= 0) {
-            return;
+        Point pt = screenCanvas.translateToClient(eventX, eventY);
+        if (pt != null) {
+            sendControlPacket("MV:" + pt.x + ":" + pt.y);
         }
-
-        // Apply Proportional Scaling Formula
-        int clientX = (int) Math.round(((double) eventX * (double) clientNativeWidth) / (double) panelW);
-        int clientY = (int) Math.round(((double) eventY * (double) clientNativeHeight) / (double) panelH);
-
-        // Boundary Clamping to prevent out-of-bounds pointer exceptions on client
-        clientX = Math.max(0, Math.min(clientNativeWidth - 1, clientX));
-        clientY = Math.max(0, Math.min(clientNativeHeight - 1, clientY));
-
-        sendControlPacket("MV:" + clientX + ":" + clientY);
     }
 
     /**
@@ -546,10 +597,17 @@ public class ServerApp extends JFrame {
                     Socket sSock = screenServerSocket.accept();
                     Socket ctrlSock = controlServerSocket.accept();
 
-                    // Apply TCP_NODELAY to disable Nagle's algorithm for low-latency transmission
+                    // Apply TCP_NODELAY and high-throughput buffer sizes
                     cSock.setTcpNoDelay(true);
                     sSock.setTcpNoDelay(true);
                     ctrlSock.setTcpNoDelay(true);
+
+                    cSock.setSendBufferSize(64 * 1024);
+                    cSock.setReceiveBufferSize(64 * 1024);
+                    sSock.setSendBufferSize(512 * 1024);
+                    sSock.setReceiveBufferSize(512 * 1024);
+                    ctrlSock.setSendBufferSize(64 * 1024);
+                    ctrlSock.setReceiveBufferSize(64 * 1024);
 
                     // Sockets verified - initialize session
                     chatSocket = cSock;
@@ -559,7 +617,7 @@ public class ServerApp extends JFrame {
                     chatReader = new BufferedReader(new InputStreamReader(chatSocket.getInputStream(), StandardCharsets.UTF_8));
                     chatWriter = new PrintWriter(new OutputStreamWriter(chatSocket.getOutputStream(), StandardCharsets.UTF_8), true);
 
-                    screenDis = new DataInputStream(new BufferedInputStream(screenSocket.getInputStream(), 128 * 1024));
+                    screenDis = new DataInputStream(new BufferedInputStream(screenSocket.getInputStream(), 256 * 1024));
 
                     controlWriter = new PrintWriter(new OutputStreamWriter(controlSocket.getOutputStream(), StandardCharsets.UTF_8), true);
 
@@ -751,9 +809,16 @@ public class ServerApp extends JFrame {
     private static class ScreenCanvas extends JPanel {
         private volatile BufferedImage currentFrame = null;
         private volatile boolean remoteControlActive = true;
+        private volatile boolean fitAspectRatio = true;
         private int nativeW = 0;
         private int nativeH = 0;
         private String serverIp = "Detecting...";
+
+        // Viewport placement metrics
+        private volatile int drawX = 0;
+        private volatile int drawY = 0;
+        private volatile int drawW = 0;
+        private volatile int drawH = 0;
 
         public ScreenCanvas() {
             setDoubleBuffered(true);
@@ -776,6 +841,15 @@ public class ServerApp extends JFrame {
             repaint();
         }
 
+        public void setFitAspectRatio(boolean fit) {
+            this.fitAspectRatio = fit;
+            repaint();
+        }
+
+        public boolean isFitAspectRatio() {
+            return fitAspectRatio;
+        }
+
         public void setClientNativeResolution(int w, int h) {
             this.nativeW = w;
             this.nativeH = h;
@@ -787,29 +861,72 @@ public class ServerApp extends JFrame {
             repaint();
         }
 
+        /**
+         * Maps local mouse coordinate to client screen coordinate space with letterbox awareness.
+         */
+        public Point translateToClient(int eventX, int eventY) {
+            int curW = drawW;
+            int curH = drawH;
+            int curX = drawX;
+            int curY = drawY;
+            if (curW <= 0 || curH <= 0 || nativeW <= 0 || nativeH <= 0) return null;
+            if (eventX < curX || eventX > curX + curW || eventY < curY || eventY > curY + curH) {
+                return null; // Cursor is outside the active display viewport
+            }
+            int clientX = (int) Math.round(((double)(eventX - curX) * nativeW) / curW);
+            int clientY = (int) Math.round(((double)(eventY - curY) * nativeH) / curH);
+            clientX = Math.max(0, Math.min(nativeW - 1, clientX));
+            clientY = Math.max(0, Math.min(nativeH - 1, clientY));
+            return new Point(clientX, clientY);
+        }
+
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
 
             int panelW = getWidth();
             int panelH = getHeight();
 
             BufferedImage frame = currentFrame;
             if (frame != null) {
+                int dX = 0, dY = 0, dW = panelW, dH = panelH;
+                if (fitAspectRatio && nativeW > 0 && nativeH > 0) {
+                    double imgAspect = (double) nativeW / (double) nativeH;
+                    double panelAspect = (double) panelW / (double) panelH;
+                    if (panelAspect > imgAspect) {
+                        dH = panelH;
+                        dW = (int) Math.round(panelH * imgAspect);
+                        dX = (panelW - dW) / 2;
+                        dY = 0;
+                    } else {
+                        dW = panelW;
+                        dH = (int) Math.round(panelW / imgAspect);
+                        dX = 0;
+                        dY = (panelH - dH) / 2;
+                    }
+                    // Letterbox background
+                    g2.setColor(new Color(12, 12, 14));
+                    g2.fillRect(0, 0, panelW, panelH);
+                }
+                drawX = dX;
+                drawY = dY;
+                drawW = dW;
+                drawH = dH;
+
                 // Render the received desktop frame scaled across the viewport panel
-                g2.drawImage(frame, 0, 0, panelW, panelH, null);
+                g2.drawImage(frame, dX, dY, dW, dH, null);
 
                 // Small HUD Indicator in top-left of canvas
-                g2.setColor(new Color(0, 0, 0, 140));
-                g2.fillRoundRect(10, 10, 180, 24, 8, 8);
+                g2.setColor(new Color(0, 0, 0, 160));
+                g2.fillRoundRect(12, 12, 190, 26, 8, 8);
                 g2.setColor(remoteControlActive ? new Color(52, 211, 153) : new Color(248, 113, 113));
-                g2.fillOval(18, 18, 8, 8);
+                g2.fillOval(20, 21, 8, 8);
                 g2.setFont(new Font("SansSerif", Font.BOLD, 11));
                 g2.setColor(Color.WHITE);
-                g2.drawString(remoteControlActive ? "CONTROL ACTIVE" : "VIEW ONLY", 32, 26);
+                g2.drawString(remoteControlActive ? "CONTROL ACTIVE" : "VIEW ONLY", 34, 29);
             } else {
                 // Idle / Waiting Background
                 g2.setColor(new Color(18, 18, 20));
