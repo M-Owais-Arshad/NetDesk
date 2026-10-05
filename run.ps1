@@ -98,6 +98,21 @@ while ($true) {
     switch ($choice) {
         "1" {
             Ensure-NetDeskCompiled
+
+            # Check if ports 5000, 5001, or 5002 are held by a stale previous session
+            try {
+                $conns = Get-NetTCPConnection -LocalPort 5000, 5001, 5002 -ErrorAction SilentlyContinue
+                if ($conns) {
+                    $stalePids = $conns.OwningProcess | Select-Object -Unique
+                    foreach ($sp in $stalePids) {
+                        if ($sp -and $sp -ne $PID) {
+                            Stop-Process -Id $sp -Force -ErrorAction SilentlyContinue
+                        }
+                    }
+                    Start-Sleep -Milliseconds 300
+                }
+            } catch {}
+
             Write-Host ""
             Write-Host "Launching Server Station..." -ForegroundColor Yellow
             Write-Host "👉 Note the Server IP on screen and share it with the Client." -ForegroundColor Cyan

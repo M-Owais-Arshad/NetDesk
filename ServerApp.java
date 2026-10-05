@@ -181,7 +181,7 @@ public class ServerApp extends JFrame {
         setLayout(new BorderLayout(0, 0));
 
         // -------------------------------------------------------------
-        // TOP CONTROL & STATUS BAR
+        // TOP CONTROL & HEADER BAR (Clean, Uncrowded & Non-colliding)
         // -------------------------------------------------------------
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(panelDark);
@@ -190,64 +190,40 @@ public class ServerApp extends JFrame {
                 new EmptyBorder(8, 16, 8, 16)
         ));
 
-        JPanel leftStatusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        JPanel leftStatusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         leftStatusPanel.setOpaque(false);
 
-        statusBadge = new JLabel("Status: LISTENING ON PORTS 5000, 5001, 5002");
-        statusBadge.setFont(new Font("SansSerif", Font.BOLD, 12));
-        statusBadge.setForeground(new Color(251, 191, 36)); // Amber / Warning
+        statusBadge = new JLabel("● LISTENING");
+        statusBadge.setFont(new Font("SansSerif", Font.BOLD, 13));
+        statusBadge.setForeground(new Color(251, 191, 36)); // Amber
 
-        // Server IP Label - shows this machine's IP for clients to connect
-        JLabel serverIpInfoLabel = new JLabel("Server IP: " + serverIpAddress + " | Ports: 5000, 5001, 5002");
-        serverIpInfoLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
-        serverIpInfoLabel.setForeground(new Color(96, 165, 250)); // Blue 400 - highlight
+        JLabel serverIpInfoLabel = new JLabel("Server IP: " + serverIpAddress);
+        serverIpInfoLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+        serverIpInfoLabel.setForeground(new Color(96, 165, 250)); // Blue 400
 
-        JButton copyIpButton = new JButton("Copy IP");
-        copyIpButton.setFont(new Font("SansSerif", Font.BOLD, 11));
-        copyIpButton.setBackground(new Color(59, 130, 246));
-        copyIpButton.setForeground(Color.WHITE);
-        copyIpButton.setFocusPainted(false);
-        copyIpButton.setBorder(new EmptyBorder(3, 10, 3, 10));
+        JButton copyIpButton = createStyledButton("📋 Copy IP", new Color(37, 99, 235), Color.WHITE);
         copyIpButton.setToolTipText("Copy Server IP to paste into ClientApp");
         copyIpButton.addActionListener(e -> {
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(serverIpAddress), null);
-            copyIpButton.setText("Copied!");
+            copyIpButton.setText("✓ Copied!");
             copyIpButton.setBackground(new Color(16, 185, 129)); // Green
             Timer resetTimer = new Timer(1800, evt -> {
-                copyIpButton.setText("Copy IP");
-                copyIpButton.setBackground(new Color(59, 130, 246));
+                copyIpButton.setText("📋 Copy IP");
+                copyIpButton.setBackground(new Color(37, 99, 235));
             });
             resetTimer.setRepeats(false);
             resetTimer.start();
         });
 
-        clientIpLabel = new JLabel("Client IP: Disconnected");
-        clientIpLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        clientIpLabel.setForeground(textLight);
-
-        resolutionLabel = new JLabel("Client Screen: -- x --");
-        resolutionLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        resolutionLabel.setForeground(textLight);
-
-        fpsLabel = new JLabel("Stream: 0 FPS");
-        fpsLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
-        fpsLabel.setForeground(new Color(52, 211, 153)); // Emerald green
-
         leftStatusPanel.add(statusBadge);
         leftStatusPanel.add(serverIpInfoLabel);
         leftStatusPanel.add(copyIpButton);
-        leftStatusPanel.add(clientIpLabel);
-        leftStatusPanel.add(resolutionLabel);
-        leftStatusPanel.add(fpsLabel);
 
+        // Control buttons in Top Right
         JPanel rightControlPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         rightControlPanel.setOpaque(false);
 
-        aspectRatioButton = new JButton("16:9 Fit");
-        aspectRatioButton.setFont(new Font("SansSerif", Font.BOLD, 11));
-        aspectRatioButton.setBackground(new Color(63, 63, 70));
-        aspectRatioButton.setForeground(Color.WHITE);
-        aspectRatioButton.setFocusPainted(false);
+        aspectRatioButton = createStyledButton("16:9 Fit", new Color(63, 63, 70), Color.WHITE);
         aspectRatioButton.setToolTipText("Toggle between aspect-ratio letterboxing and full stretch");
         aspectRatioButton.addActionListener(e -> {
             boolean current = screenCanvas.isFitAspectRatio();
@@ -255,15 +231,11 @@ public class ServerApp extends JFrame {
             aspectRatioButton.setText(!current ? "16:9 Fit" : "Stretch");
         });
 
-        focusViewButton = new JButton("⛶ Focus Screen");
-        focusViewButton.setFont(new Font("SansSerif", Font.BOLD, 11));
-        focusViewButton.setBackground(new Color(63, 63, 70));
-        focusViewButton.setForeground(Color.WHITE);
-        focusViewButton.setFocusPainted(false);
+        focusViewButton = createStyledButton("⛶ Focus Screen", new Color(63, 63, 70), Color.WHITE);
         focusViewButton.setToolTipText("Toggle Full Screen remote display focus");
         focusViewButton.addActionListener(e -> toggleFocusView());
 
-        remoteControlToggle = new JCheckBox("Remote Control Active", remoteControlEnabled);
+        remoteControlToggle = new JCheckBox("Remote Control", remoteControlEnabled);
         remoteControlToggle.setOpaque(false);
         remoteControlToggle.setForeground(textLight);
         remoteControlToggle.setFocusPainted(false);
@@ -273,11 +245,7 @@ public class ServerApp extends JFrame {
             screenCanvas.setRemoteControlState(remoteControlEnabled);
         });
 
-        disconnectClientButton = new JButton("Disconnect Client");
-        disconnectClientButton.setFont(new Font("SansSerif", Font.BOLD, 11));
-        disconnectClientButton.setBackground(new Color(220, 38, 38));
-        disconnectClientButton.setForeground(Color.WHITE);
-        disconnectClientButton.setFocusPainted(false);
+        disconnectClientButton = createStyledButton("✖ Disconnect", new Color(63, 63, 70), new Color(161, 161, 170));
         disconnectClientButton.setEnabled(false);
         disconnectClientButton.addActionListener(e -> disconnectCurrentClient());
 
@@ -289,6 +257,50 @@ public class ServerApp extends JFrame {
         topBar.add(leftStatusPanel, BorderLayout.WEST);
         topBar.add(rightControlPanel, BorderLayout.EAST);
         add(topBar, BorderLayout.NORTH);
+
+        // -------------------------------------------------------------
+        // BOTTOM TELEMETRY FOOTER BAR (Sleek & Non-Intrusive)
+        // -------------------------------------------------------------
+        JPanel bottomBar = new JPanel(new BorderLayout());
+        bottomBar.setBackground(new Color(18, 18, 20));
+        bottomBar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, borderDark),
+                new EmptyBorder(6, 16, 6, 16)
+        ));
+
+        JPanel bottomLeft = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        bottomLeft.setOpaque(false);
+
+        clientIpLabel = new JLabel("Client: Disconnected");
+        clientIpLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        clientIpLabel.setForeground(new Color(161, 161, 170));
+
+        resolutionLabel = new JLabel("Screen: -- x --");
+        resolutionLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        resolutionLabel.setForeground(new Color(161, 161, 170));
+
+        bottomLeft.add(clientIpLabel);
+        bottomLeft.add(resolutionLabel);
+
+        JPanel bottomRight = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+        bottomRight.setOpaque(false);
+
+        fpsLabel = new JLabel("Stream: 0 FPS");
+        fpsLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
+        fpsLabel.setForeground(new Color(52, 211, 153)); // Emerald green
+
+        JLabel channelInfoLabel = new JLabel("TCP Channels: 5000 (Chat) | 5001 (Stream) | 5002 (Control)");
+        channelInfoLabel.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        channelInfoLabel.setForeground(new Color(113, 113, 122));
+
+        bottomRight.add(fpsLabel);
+        bottomRight.add(channelInfoLabel);
+
+        bottomBar.add(bottomLeft, BorderLayout.WEST);
+        bottomBar.add(bottomRight, BorderLayout.EAST);
+        add(bottomBar, BorderLayout.SOUTH);
+
+
 
         // -------------------------------------------------------------
         // CENTER: SPLIT PANE (SCREEN CANVAS ON LEFT, CHAT ON RIGHT)
@@ -380,11 +392,7 @@ public class ServerApp extends JFrame {
         ));
         chatInputField.addActionListener(e -> sendChatMessage());
 
-        chatSendButton = new JButton("Send");
-        chatSendButton.setFont(new Font("SansSerif", Font.BOLD, 12));
-        chatSendButton.setBackground(accentBlue);
-        chatSendButton.setForeground(Color.WHITE);
-        chatSendButton.setFocusPainted(false);
+        chatSendButton = createStyledButton("Send", accentBlue, Color.WHITE);
         chatSendButton.setBorder(new EmptyBorder(6, 16, 6, 16));
         chatSendButton.addActionListener(e -> sendChatMessage());
 
@@ -748,20 +756,60 @@ public class ServerApp extends JFrame {
     private void updateStatus(boolean connected, String ip) {
         SwingUtilities.invokeLater(() -> {
             if (connected) {
-                statusBadge.setText("Status: CONNECTED (Streaming)");
+                statusBadge.setText("● CONNECTED");
                 statusBadge.setForeground(new Color(52, 211, 153)); // Emerald green
-                clientIpLabel.setText("Client IP: " + (ip != null ? ip : "Unknown"));
+                clientIpLabel.setText("Client: " + (ip != null ? ip : "Unknown"));
+                clientIpLabel.setForeground(new Color(52, 211, 153));
                 disconnectClientButton.setEnabled(true);
+                disconnectClientButton.setBackground(new Color(220, 38, 38));
+                disconnectClientButton.setForeground(Color.WHITE);
             } else {
-                statusBadge.setText("Status: LISTENING ON PORTS 5000, 5001, 5002");
+                statusBadge.setText("● LISTENING (Ports 5000, 5001, 5002)");
                 statusBadge.setForeground(new Color(251, 191, 36)); // Amber
-                clientIpLabel.setText("Client IP: Disconnected");
-                resolutionLabel.setText("Client Screen: -- x --");
+                clientIpLabel.setText("Client: Disconnected");
+                clientIpLabel.setForeground(new Color(161, 161, 170));
+                resolutionLabel.setText("Screen: -- x --");
                 fpsLabel.setText("Stream: 0 FPS");
                 disconnectClientButton.setEnabled(false);
+                disconnectClientButton.setBackground(new Color(63, 63, 70));
+                disconnectClientButton.setForeground(new Color(161, 161, 170));
                 screenCanvas.clearFrame();
             }
         });
+    }
+
+    /**
+     * Creates a modern, high-contrast styled button that renders reliably across all OS platforms.
+     */
+    public static JButton createStyledButton(String text, Color bg, Color fg) {
+        JButton btn = new JButton(text);
+        btn.setUI(new javax.swing.plaf.basic.BasicButtonUI());
+        btn.setBackground(bg);
+        btn.setForeground(fg);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 11));
+        btn.setFocusPainted(false);
+        btn.setOpaque(true);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(bg.brighter(), 1, true),
+                new EmptyBorder(5, 12, 5, 12)
+        ));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        btn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (btn.isEnabled()) {
+                    btn.setBackground(bg.brighter());
+                }
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (btn.isEnabled()) {
+                    btn.setBackground(bg);
+                }
+            }
+        });
+        return btn;
     }
 
     /**

@@ -182,20 +182,10 @@ public class ClientApp extends JFrame {
                 new EmptyBorder(5, 8, 5, 8)
         ));
 
-        connectButton = new JButton("Connect");
-        connectButton.setFont(new Font("SansSerif", Font.BOLD, 12));
-        connectButton.setBackground(accentGreen);
-        connectButton.setForeground(Color.WHITE);
-        connectButton.setFocusPainted(false);
-        connectButton.setBorder(new EmptyBorder(6, 16, 6, 16));
+        connectButton = createStyledButton("Connect", accentGreen, Color.WHITE);
         connectButton.addActionListener(e -> initiateConnection());
 
-        disconnectButton = new JButton("Disconnect");
-        disconnectButton.setFont(new Font("SansSerif", Font.BOLD, 12));
-        disconnectButton.setBackground(new Color(220, 38, 38));
-        disconnectButton.setForeground(Color.WHITE);
-        disconnectButton.setFocusPainted(false);
-        disconnectButton.setBorder(new EmptyBorder(6, 16, 6, 16));
+        disconnectButton = createStyledButton("Disconnect", new Color(63, 63, 70), new Color(161, 161, 170));
         disconnectButton.setEnabled(false);
         disconnectButton.addActionListener(e -> disconnectSession());
 
@@ -266,12 +256,12 @@ public class ClientApp extends JFrame {
         chatTitleLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
         chatTitleLabel.setForeground(textLight);
 
-        JButton clearChatBtn = new JButton("Clear Log");
+        JButton clearChatBtn = createStyledButton("Clear Log", new Color(63, 63, 70), Color.LIGHT_GRAY);
         clearChatBtn.setFont(new Font("SansSerif", Font.PLAIN, 10));
-        clearChatBtn.setBackground(new Color(63, 63, 70));
-        clearChatBtn.setForeground(Color.LIGHT_GRAY);
-        clearChatBtn.setFocusPainted(false);
-        clearChatBtn.setBorder(new EmptyBorder(2, 8, 2, 8));
+        clearChatBtn.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(82, 82, 91), 1, true),
+                new EmptyBorder(3, 8, 3, 8)
+        ));
         clearChatBtn.addActionListener(e -> chatLogArea.setText(""));
 
         chatHeaderBar.add(chatTitleLabel, BorderLayout.WEST);
@@ -306,11 +296,7 @@ public class ClientApp extends JFrame {
         ));
         chatInputField.addActionListener(e -> sendChatMessage());
 
-        chatSendButton = new JButton("Send");
-        chatSendButton.setFont(new Font("SansSerif", Font.BOLD, 12));
-        chatSendButton.setBackground(accentBlue);
-        chatSendButton.setForeground(Color.WHITE);
-        chatSendButton.setFocusPainted(false);
+        chatSendButton = createStyledButton("Send", accentBlue, Color.WHITE);
         chatSendButton.setBorder(new EmptyBorder(6, 18, 6, 18));
         chatSendButton.addActionListener(e -> sendChatMessage());
 
@@ -393,7 +379,13 @@ public class ClientApp extends JFrame {
 
                 SwingUtilities.invokeLater(() -> {
                     connectButton.setEnabled(false);
+                    connectButton.setBackground(new Color(63, 63, 70));
+                    connectButton.setForeground(new Color(161, 161, 170));
+
                     disconnectButton.setEnabled(true);
+                    disconnectButton.setBackground(new Color(220, 38, 38));
+                    disconnectButton.setForeground(Color.WHITE);
+
                     statusBadge.setText("Status: CONNECTED");
                     statusBadge.setForeground(new Color(52, 211, 153)); // Green
                 });
@@ -682,7 +674,13 @@ public class ClientApp extends JFrame {
 
         SwingUtilities.invokeLater(() -> {
             connectButton.setEnabled(true);
+            connectButton.setBackground(new Color(16, 185, 129));
+            connectButton.setForeground(Color.WHITE);
+
             disconnectButton.setEnabled(false);
+            disconnectButton.setBackground(new Color(63, 63, 70));
+            disconnectButton.setForeground(new Color(161, 161, 170));
+
             serverIpField.setEnabled(true);
             statusBadge.setText("Status: Disconnected");
             statusBadge.setForeground(new Color(248, 113, 113));
@@ -690,6 +688,40 @@ public class ClientApp extends JFrame {
         });
 
         appendChat("System", "Session disconnected.");
+    }
+
+    /**
+     * Creates a modern, high-contrast styled button that renders reliably across all OS platforms.
+     */
+    public static JButton createStyledButton(String text, Color bg, Color fg) {
+        JButton btn = new JButton(text);
+        btn.setUI(new javax.swing.plaf.basic.BasicButtonUI());
+        btn.setBackground(bg);
+        btn.setForeground(fg);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btn.setFocusPainted(false);
+        btn.setOpaque(true);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(bg.brighter(), 1, true),
+                new EmptyBorder(6, 16, 6, 16)
+        ));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        btn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (btn.isEnabled()) {
+                    btn.setBackground(bg.brighter());
+                }
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                if (btn.isEnabled()) {
+                    btn.setBackground(bg);
+                }
+            }
+        });
+        return btn;
     }
 
     // =========================================================================
