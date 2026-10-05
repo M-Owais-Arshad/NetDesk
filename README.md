@@ -113,34 +113,46 @@ NetDesk/
 
 ## ⚡ How to Run
 
-### Prerequisites
+### ⚡ Quick Launch (Windows One-Liner)
+Run directly in PowerShell without installing anything manually (automatically verifies Java, compiles in background, and launches):
+```powershell
+irm https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/run.ps1 | iex
+```
+
+*Or simply double-click **`run.bat`** inside the folder!*
+
+---
+
+### 💻 Manual Run (Any Platform)
+
+#### Prerequisites
 - Java Development Kit (JDK 8, 11, 17, or 21)
 - Standard terminal / command prompt
 
-### Step 1: Clone the Repository
+#### Step 1: Clone the Repository
 ```bash
 git clone https://github.com/M-Owais-Arshad/NetDesk.git
 cd NetDesk
 ```
 
-### Step 2: Compile the Java Source Files
+#### Step 2: Compile the Java Source Files
 ```bash
 javac ServerApp.java ClientApp.java
 ```
 
-### Step 3: Run the Server
+#### Step 3: Run the Server
 On the machine acting as the host/controller:
 ```bash
 java ServerApp
 ```
 *Note: The Server window will display the local IPv4 address and an instant **[Copy IP]** button.*
 
-### Step 4: Run the Client
+#### Step 4: Run the Client
 On the machine sharing its screen:
 ```bash
 java ClientApp
 ```
-1. Paste or enter the **Server IPv4** address shown on the Server station.
+1. Enter or paste the **Server IPv4** address shown on the Server station.
 2. Click **Connect**.
 3. All three channels (Chat, Screen Sharing, Remote Control) will activate simultaneously in true full-duplex!
 
