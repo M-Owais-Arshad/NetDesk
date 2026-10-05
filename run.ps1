@@ -13,20 +13,28 @@ Write-Host ""
 
 # Determine workspace directory
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path -ErrorAction SilentlyContinue
-if ($scriptDir) { Set-Location $scriptDir }
-
-# If invoked via remote `irm ... | iex` in an empty folder, auto-download source files
-if (-not (Test-Path "ServerApp.java") -or -not (Test-Path "ClientApp.java")) {
-    Write-Host "[i] Downloading NetDesk files from GitHub repository..." -ForegroundColor Cyan
-    $dest = Join-Path (Get-Location).Path "NetDesk"
+if ($scriptDir) {
+    Set-Location $scriptDir
+} else {
+    # If invoked directly via `irm ... | iex`, store predictably in C:\Users\<Username>\NetDesk
+    $dest = Join-Path $env:USERPROFILE "NetDesk"
     if (-not (Test-Path $dest)) {
         New-Item -ItemType Directory -Path $dest -Force | Out-Null
     }
     Set-Location $dest
-    if (-not (Test-Path "ServerApp.java")) {
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ServerApp.java" -OutFile "ServerApp.java"
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ClientApp.java" -OutFile "ClientApp.java"
-    }
+}
+
+Write-Host "📂 Working Folder: $((Get-Location).Path)" -ForegroundColor Gray
+Write-Host ""
+
+# If source files are missing in this folder, auto-download from GitHub
+if (-not (Test-Path "ServerApp.java") -or -not (Test-Path "ClientApp.java")) {
+    Write-Host "[i] Downloading NetDesk files from GitHub repository..." -ForegroundColor Cyan
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ServerApp.java" -OutFile "ServerApp.java" -UseBasicParsing
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ClientApp.java" -OutFile "ClientApp.java" -UseBasicParsing
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/run.bat" -OutFile "run.bat" -UseBasicParsing
+    Write-Host "[✓] Download complete into: $((Get-Location).Path)" -ForegroundColor Green
+    Write-Host ""
 }
 
 # Step 1: Check Java Environment
@@ -89,11 +97,12 @@ function Ensure-NetDeskCompiled {
 # Step 2: Interactive Menu
 while ($true) {
     Write-Host "Select an option to launch:" -ForegroundColor White
-    Write-Host "  [1] Launch SERVER  (Host Machine / Control Screen)" -ForegroundColor Yellow
-    Write-Host "  [2] Launch CLIENT  (Share Screen & Accept Remote Control)" -ForegroundColor Green
-    Write-Host "  [3] Exit" -ForegroundColor Gray
+    Write-Host "  [1] Launch SERVER      (Host Machine / Control Screen)" -ForegroundColor Yellow
+    Write-Host "  [2] Launch CLIENT      (Share Screen & Accept Remote Control)" -ForegroundColor Green
+    Write-Host "  [3] Update NetDesk     (Pull latest version from GitHub)" -ForegroundColor Cyan
+    Write-Host "  [4] Exit" -ForegroundColor Gray
     Write-Host ""
-    $choice = Read-Host "Enter your choice [1-3]"
+    $choice = Read-Host "Enter your choice [1-4]"
 
     switch ($choice) {
         "1" {
@@ -130,11 +139,29 @@ while ($true) {
             exit 0
         }
         "3" {
+            Write-Host ""
+            Write-Host "[i] Fetching latest files from GitHub..." -ForegroundColor Cyan
+            try {
+                Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ServerApp.java" -OutFile "ServerApp.java" -UseBasicParsing
+                Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ClientApp.java" -OutFile "ClientApp.java" -UseBasicParsing
+                Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/run.bat" -OutFile "run.bat" -UseBasicParsing
+                Write-Host "[✓] Source files updated." -ForegroundColor Green
+                Write-Host "[i] Recompiling components..." -ForegroundColor Cyan
+                javac ServerApp.java ClientApp.java
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "[✓] NetDesk successfully updated to latest version!" -ForegroundColor Green
+                }
+            } catch {
+                Write-Host "[X] Update failed: $_" -ForegroundColor Red
+            }
+            Write-Host ""
+        }
+        "4" {
             Write-Host "Exiting NetDesk..." -ForegroundColor Gray
             exit 0
         }
         default {
-            Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+            Write-Host "Invalid choice. Please enter 1, 2, 3, or 4." -ForegroundColor Red
             Write-Host ""
         }
     }
