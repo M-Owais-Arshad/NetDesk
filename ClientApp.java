@@ -104,12 +104,16 @@ public class ClientApp extends JFrame {
     private JTextField serverIpField;
     private JButton connectButton;
     private JButton disconnectButton;
+    private JButton shareScreenButton;
     private JLabel statusBadge;
     private JLabel resolutionBadge;
     private JLabel fpsBadge;
     private JTextArea chatLogArea;
     private JTextField chatInputField;
     private JButton chatSendButton;
+
+    // --- Screen Sharing State Control ---
+    private final AtomicBoolean isScreenSharingActive = new AtomicBoolean(false);
 
     public ClientApp() {
         super("NetDesk - Remote Desktop & Full-Duplex Collaboration Station [CLIENT]");
@@ -189,10 +193,16 @@ public class ClientApp extends JFrame {
         disconnectButton.setEnabled(false);
         disconnectButton.addActionListener(e -> disconnectSession());
 
+        shareScreenButton = createStyledButton("▶ Start Screen Share", new Color(63, 63, 70), new Color(161, 161, 170));
+        shareScreenButton.setEnabled(false);
+        shareScreenButton.setToolTipText("Toggle streaming your desktop to the remote operator");
+        shareScreenButton.addActionListener(e -> toggleScreenSharing());
+
         connectionControls.add(ipLabel);
         connectionControls.add(serverIpField);
         connectionControls.add(connectButton);
         connectionControls.add(disconnectButton);
+        connectionControls.add(shareScreenButton);
 
         // Status & Diagnostic Metadata
         JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 14, 0));
@@ -386,11 +396,16 @@ public class ClientApp extends JFrame {
                     disconnectButton.setBackground(new Color(220, 38, 38));
                     disconnectButton.setForeground(Color.WHITE);
 
-                    statusBadge.setText("Status: CONNECTED");
+                    shareScreenButton.setEnabled(true);
+                    shareScreenButton.setText("▶ Start Screen Share");
+                    shareScreenButton.setBackground(new Color(37, 99, 235)); // Blue for ready to share
+                    shareScreenButton.setForeground(Color.WHITE);
+
+                    statusBadge.setText("Status: CONNECTED (Ready)");
                     statusBadge.setForeground(new Color(52, 211, 153)); // Green
                 });
 
-                appendChat("System", "Successfully connected to Server! Desktop streaming and remote control active.");
+                appendChat("System", "Connected to Server! Click 'Start Screen Share' whenever you wish to share your desktop.");
 
                 // Latch = 3: All three threads (Chat + Screen + Control) must finish
                 // before session cleanup runs. This ensures true full-duplex operation
@@ -469,9 +484,40 @@ public class ClientApp extends JFrame {
             ImageWriter writer = writers.next();
             ImageWriteParam writeParam = writer.getDefaultWriteParam();
             writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            writeParam.setCompressionQuality(0.70f); // 70% quality: crisp text, 50% smaller payload, ultra-fast compression
+            writeParam.setCompressionQuality(0.70f); // 70% quality: crisp text, 50% smaller payload
+
+            boolean wasSharing = false;
+            boolean sentInitialPlaceholder = false;
 
             while (isConnected.get()) {
+                if (!isScreenSharingActive.get()) {
+                    // Screen sharing paused / waiting for client initiation
+                    if (wasSharing || !sentInitialPlaceholder) {
+                        BufferedImage placeholder = createPlaceholderFrame(captureRect.width, captureRect.height,
+                                "Screen Sharing Paused by Client",
+                                "Waiting for Client to start screen stream...");
+
+                        baos.reset();
+                        ImageOutputStream ios = new MemoryCacheImageOutputStream(baos);
+                        writer.setOutput(ios);
+                        writer.write(null, new IIOImage(placeholder, null, null), writeParam);
+                        ios.flush();
+                        ios.close();
+
+                        byte[] placeholderBytes = baos.toByteArray();
+                        screenDos.writeInt(placeholderBytes.length);
+                        screenDos.write(placeholderBytes);
+                        screenDos.flush();
+
+                        wasSharing = false;
+                        sentInitialPlaceholder = true;
+                    }
+
+                    Thread.sleep(150); // Sleep while paused: 0% CPU & zero bandwidth
+                    continue;
+                }
+
+                wasSharing = true;
                 long frameStart = System.currentTimeMillis();
 
                 // 1. Capture screen surface using Robot
@@ -533,6 +579,9 @@ public class ClientApp extends JFrame {
      */
     private void executeRemoteCommand(String packet) {
         if (packet == null || packet.isEmpty()) return;
+        if (!isScreenSharingActive.get()) {
+            return; // Security safeguard: Disallow remote inputs while screen sharing is paused
+        }
 
         try {
             String[] tokens = packet.split(":");
@@ -681,6 +730,12 @@ public class ClientApp extends JFrame {
             disconnectButton.setBackground(new Color(63, 63, 70));
             disconnectButton.setForeground(new Color(161, 161, 170));
 
+            shareScreenButton.setEnabled(false);
+            shareScreenButton.setText("▶ Start Screen Share");
+            shareScreenButton.setBackground(new Color(63, 63, 70));
+            shareScreenButton.setForeground(new Color(161, 161, 170));
+            isScreenSharingActive.set(false);
+
             serverIpField.setEnabled(true);
             statusBadge.setText("Status: Disconnected");
             statusBadge.setForeground(new Color(248, 113, 113));
@@ -688,6 +743,74 @@ public class ClientApp extends JFrame {
         });
 
         appendChat("System", "Session disconnected.");
+    }
+
+    /**
+     * Toggles screen sharing on or off while connected.
+     */
+    private void toggleScreenSharing() {
+        if (!isConnected.get()) return;
+        boolean nowActive = !isScreenSharingActive.get();
+        isScreenSharingActive.set(nowActive);
+
+        if (nowActive) {
+            shareScreenButton.setText("⏹ Stop Screen Share");
+            shareScreenButton.setBackground(new Color(220, 38, 38)); // Red
+            statusBadge.setText("Status: STREAMING");
+            statusBadge.setForeground(new Color(52, 211, 153));
+            appendChat("System", "Desktop stream started. Remote operator can view your desktop.");
+        } else {
+            shareScreenButton.setText("▶ Start Screen Share");
+            shareScreenButton.setBackground(new Color(37, 99, 235)); // Blue
+            statusBadge.setText("Status: CONNECTED (Paused)");
+            statusBadge.setForeground(new Color(251, 191, 36));
+            fpsBadge.setText("Stream: 0 FPS");
+            appendChat("System", "Desktop stream paused. Screen hidden from remote operator.");
+        }
+    }
+
+    /**
+     * Creates a sleek dark-themed status frame when screen sharing is paused.
+     */
+    private BufferedImage createPlaceholderFrame(int width, int height, String title, String subtitle) {
+        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2 = img.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+        // Dark background
+        g2.setColor(new Color(18, 18, 20));
+        g2.fillRect(0, 0, width, height);
+
+        // Center status card
+        int boxW = Math.min(620, width - 40);
+        int boxH = 170;
+        int boxX = (width - boxW) / 2;
+        int boxY = (height - boxH) / 2;
+
+        g2.setColor(new Color(30, 30, 36));
+        g2.fillRoundRect(boxX, boxY, boxW, boxH, 16, 16);
+        g2.setColor(new Color(63, 63, 70));
+        g2.drawRoundRect(boxX, boxY, boxW, boxH, 16, 16);
+
+        // Icon Pill
+        g2.setColor(new Color(239, 68, 68));
+        g2.fillOval(boxX + boxW / 2 - 12, boxY + 24, 24, 24);
+
+        // Title
+        g2.setFont(new Font("SansSerif", Font.BOLD, 18));
+        g2.setColor(Color.WHITE);
+        FontMetrics fm = g2.getFontMetrics();
+        g2.drawString(title, (width - fm.stringWidth(title)) / 2, boxY + 85);
+
+        // Subtitle
+        g2.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        g2.setColor(new Color(161, 161, 170));
+        FontMetrics fmSub = g2.getFontMetrics();
+        g2.drawString(subtitle, (width - fmSub.stringWidth(subtitle)) / 2, boxY + 120);
+
+        g2.dispose();
+        return img;
     }
 
     /**

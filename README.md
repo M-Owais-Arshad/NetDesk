@@ -20,6 +20,7 @@
 - **📺 Real-Time Butter-Smooth Desktop Streaming (~30 FPS):**
   - High-performance display capture powered by `java.awt.Robot` with `autoWaitForIdle(false)`.
   - Cached JPEG ImageWriter pipeline with 70% explicit quality tuning (50% smaller payload, 3x faster compression).
+  - **🔒 Privacy-First Client Screen Share Control:** Client connects in a secure ready state; screen stream and remote control only activate when the client user clicks **[ ▶ Start Screen Share ]**. When paused, a clean placeholder frame is rendered and remote inputs are safely locked.
   - 4-byte length-prefixed binary framing to eliminate TCP packet fragmentation.
   - Large 512KB socket transmit/receive buffers to avoid TCP window choking.
   - Real-time stream telemetry with live **FPS (Frames Per Second)** diagnostics.

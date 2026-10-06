@@ -27,18 +27,34 @@ if ($scriptDir) {
 Write-Host "📂 Working Folder: $((Get-Location).Path)" -ForegroundColor Gray
 Write-Host ""
 
-# If source files are missing in this folder, auto-download from GitHub
-if (-not (Test-Path "ServerApp.java") -or -not (Test-Path "ClientApp.java")) {
-    Write-Host "[i] Downloading NetDesk files from GitHub repository..." -ForegroundColor Cyan
-    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ServerApp.java" -OutFile "ServerApp.java" -UseBasicParsing
-    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ClientApp.java" -OutFile "ClientApp.java" -UseBasicParsing
-    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/run.bat" -OutFile "run.bat" -UseBasicParsing
-    Write-Host "[✓] Download complete into: $((Get-Location).Path)" -ForegroundColor Green
-    Write-Host ""
-}
+# Step 1: Automatic Update Synchronization on Launch
+Write-Host "[1/3] Checking for latest NetDesk updates..." -ForegroundColor Cyan
+try {
+    if (Test-Path ".git") {
+        # If running inside a git clone, synchronize via git pull
+        $gitRes = git pull --quiet 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[✓] Repository synchronized with GitHub (git pull)." -ForegroundColor Green
+        }
+    } else {
+        # Standalone installation: fast fetch latest code from GitHub
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ServerApp.java" -OutFile "ServerApp.java.tmp" -TimeoutSec 4 -UseBasicParsing -ErrorAction Stop
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/ClientApp.java" -OutFile "ClientApp.java.tmp" -TimeoutSec 4 -UseBasicParsing -ErrorAction Stop
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/run.bat" -OutFile "run.bat.tmp" -TimeoutSec 4 -UseBasicParsing -ErrorAction Stop
 
-# Step 1: Check Java Environment
-Write-Host "[1/2] Verifying Java Environment..." -ForegroundColor White
+        Move-Item -Path "ServerApp.java.tmp" -Destination "ServerApp.java" -Force
+        Move-Item -Path "ClientApp.java.tmp" -Destination "ClientApp.java" -Force
+        Move-Item -Path "run.bat.tmp" -Destination "run.bat" -Force
+        Write-Host "[✓] NetDesk updated to latest version from GitHub." -ForegroundColor Green
+    }
+} catch {
+    # If offline or network timeout, cleanly proceed with local copy
+    Write-Host "[-] Using local version (offline / fast launch)." -ForegroundColor Gray
+}
+Write-Host ""
+
+# Step 2: Check Java Environment
+Write-Host "[2/3] Verifying Java Environment..." -ForegroundColor White
 $javaOk = $false
 try {
     $ver = java -version 2>&1
