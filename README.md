@@ -1,11 +1,11 @@
-# 🖥️ NetDesk: Multi-Channel Remote Desktop & Full-Duplex Collaboration System
+# 🖥️ Zeta-NetDesk: Multi-Channel Remote Desktop & Full-Duplex Collaboration System
 
 [![Java](https://img.shields.io/badge/Java-8%20%7C%2011%20%7C%2017%20%7C%2021-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
 [![Architecture](https://img.shields.io/badge/Architecture-Multi--Channel%20TCP-blue?style=for-the-badge)](https://en.wikipedia.org/wiki/Transmission_Control_Protocol)
 [![OSI Model](https://img.shields.io/badge/OSI%20Model-Layers%204%E2%80%947-success?style=for-the-badge)](https://en.wikipedia.org/wiki/OSI_model)
 [![GUI](https://img.shields.io/badge/GUI-Java%20Swing%20Dark%20HUD-1f2937?style=for-the-badge)](https://docs.oracle.com/javase/tutorial/uiswing/)
 
-**NetDesk** is a high-performance, low-latency Remote Desktop and Collaboration platform developed in core Java without any external dependencies. It combines real-time screen streaming, hardware-level remote control input execution (RDP), and full-duplex asynchronous chat over dedicated, isolated TCP network channels.
+**Zeta-NetDesk** is a high-performance, low-latency Remote Desktop and Collaboration platform developed in core Java without any external dependencies. It combines real-time screen streaming, hardware-level remote control input execution (RDP), and full-duplex asynchronous chat over dedicated, isolated TCP network channels.
 
 ---
 
@@ -103,9 +103,11 @@ Coordinates are bounded and clamped to prevent boundary exceptions on the client
 ## 🛠️ Project Structure
 
 ```bash
-NetDesk/
+Zeta-NetDesk/
 ├── ServerApp.java       # Server Station (Listener, Video Canvas, Chat, Input Sender)
 ├── ClientApp.java       # Client Station (Screen Streamer, RDP Executor, Chat)
+├── run.ps1              # Zero-config smart launcher & diagnostics monitor
+├── run.bat              # One-click Windows batch launcher
 ├── .gitignore           # Git ignore configuration
 └── README.md            # Comprehensive project documentation
 ```
@@ -117,7 +119,7 @@ NetDesk/
 ### ⚡ Quick Launch (Windows One-Liner)
 Run directly in PowerShell without installing anything manually (automatically verifies Java, compiles in background, and launches):
 ```powershell
-irm https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/run.ps1 | iex
+irm https://raw.githubusercontent.com/M-Owais-Arshad/Zeta-NetDesk/main/run.ps1 | iex
 ```
 
 *Or simply double-click **`run.bat`** inside the folder!*
@@ -127,13 +129,13 @@ irm https://raw.githubusercontent.com/M-Owais-Arshad/NetDesk/main/run.ps1 | iex
 ### 💻 Manual Run (Any Platform)
 
 #### Prerequisites
-- Java Development Kit (JDK 8, 11, 17, or 21)
+- Java Development Kit (JDK 8, 11, 17, or 21) or Java Runtime (JRE 8+)
 - Standard terminal / command prompt
 
 #### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/M-Owais-Arshad/NetDesk.git
-cd NetDesk
+git clone https://github.com/M-Owais-Arshad/Zeta-NetDesk.git
+cd Zeta-NetDesk
 ```
 
 #### Step 2: Compile the Java Source Files

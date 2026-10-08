@@ -1,9 +1,4 @@
-# Byte-compiled / Object files
-*.class
-
-# Package Files
-*.jar
-*.war
+# Virtual Machine Crash Logs
 *.nar
 *.ear
 *.zip

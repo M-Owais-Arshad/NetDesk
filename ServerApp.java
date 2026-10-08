@@ -127,7 +127,7 @@ public class ServerApp extends JFrame {
     private ScheduledExecutorService metricsScheduler;
 
     public ServerApp() {
-        super("NetDesk - Remote Desktop & Full-Duplex Collaboration Station [SERVER]");
+        super("Zeta-NetDesk - Remote Desktop & Full-Duplex Collaboration Station [SERVER]");
         detectServerIp();
         initUI();
         startServerListeners();
@@ -656,9 +656,23 @@ public class ServerApp extends JFrame {
                     // Perform graceful session cleanup and prepare for next client
                     cleanupClientSession();
                 }
+            } catch (BindException be) {
+                logCrash("Port binding conflict on ServerApp", be);
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(ServerApp.this,
+                            "Port Conflict Detected:\nOne or more required ports (" + CHAT_PORT + ", " + SCREEN_PORT + ", " + CONTROL_PORT + ") are already in use.\n\n" +
+                            "Please close any previous NetDesk window or terminate running Java processes.",
+                            "Port Conflict Error", JOptionPane.ERROR_MESSAGE);
+                });
             } catch (IOException e) {
                 if (isServerRunning.get()) {
+                    logCrash("Server socket exception", e);
                     appendChat("System", "Server socket exception: " + e.getMessage());
+                }
+            } catch (Exception e) {
+                if (isServerRunning.get()) {
+                    logCrash("Server listener unexpected exception", e);
+                    appendChat("System", "Server listener error: " + e.getMessage());
                 }
             }
         });
@@ -675,6 +689,8 @@ public class ServerApp extends JFrame {
             }
         } catch (IOException e) {
             // Channel broken or client disconnected
+        } catch (Exception e) {
+            logCrash("Chat receiver exception", e);
         } finally {
             sessionLatch.countDown();
         }
@@ -728,6 +744,8 @@ public class ServerApp extends JFrame {
             // Clean EOF on stream close
         } catch (IOException e) {
             // Socket broken or client disconnected
+        } catch (Exception e) {
+            logCrash("Screen receiver exception", e);
         } finally {
             sessionLatch.countDown();
         }
@@ -1032,17 +1050,55 @@ public class ServerApp extends JFrame {
     }
 
     // =========================================================================
+    // CRASH REPORTING & DIAGNOSTICS ENGINE
+    // =========================================================================
+    public static void logCrash(String context, Throwable t) {
+        try (PrintWriter pw = new PrintWriter(new FileWriter("netdesk_crash.log", true))) {
+            pw.println("==================================================");
+            pw.println("NETDESK CRASH REPORT - " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+            pw.println("Role: Server Station (ServerApp)");
+            pw.println("Context: " + context);
+            pw.println("Java Version: " + System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")");
+            pw.println("OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version") + " (" + System.getProperty("os.arch") + ")");
+            pw.println("Exception: " + t.toString());
+            t.printStackTrace(pw);
+            pw.println("==================================================");
+            pw.println();
+        } catch (Exception ignored) {}
+    }
+
+    // =========================================================================
     // MAIN LAUNCHER
     // =========================================================================
     public static void main(String[] args) {
+        // Register Global Uncaught Exception Handler
+        Thread.setDefaultUncaughtExceptionHandler((t, ex) -> {
+            logCrash("Uncaught exception in thread [" + t.getName() + "]", ex);
+            SwingUtilities.invokeLater(() -> {
+                JOptionPane.showMessageDialog(null,
+                        "An unexpected error occurred in NetDesk Server:\n" + ex.toString() +
+                        "\n\nDetails have been logged to 'netdesk_crash.log'.",
+                        "NetDesk Server Error", JOptionPane.ERROR_MESSAGE);
+            });
+        });
+
         // Apply system-native or clean cross-platform look and feel
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception ignored) {}
 
         SwingUtilities.invokeLater(() -> {
-            ServerApp server = new ServerApp();
-            server.setVisible(true);
+            try {
+                ServerApp server = new ServerApp();
+                server.setVisible(true);
+            } catch (Throwable t) {
+                logCrash("Fatal startup error in ServerApp", t);
+                JOptionPane.showMessageDialog(null,
+                        "Failed to start NetDesk Server:\n" + t.toString() +
+                        "\n\nDetails saved to 'netdesk_crash.log'.",
+                        "Startup Error", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
         });
     }
 }

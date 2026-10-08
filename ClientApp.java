@@ -116,7 +116,7 @@ public class ClientApp extends JFrame {
     private final AtomicBoolean isScreenSharingActive = new AtomicBoolean(false);
 
     public ClientApp() {
-        super("NetDesk - Remote Desktop & Full-Duplex Collaboration Station [CLIENT]");
+        super("Zeta-NetDesk - Remote Desktop & Full-Duplex Collaboration Station [CLIENT]");
         initHardwareRobot();
         initUI();
         startMetricsEngine();
@@ -130,10 +130,23 @@ public class ClientApp extends JFrame {
             robot = new Robot();
             robot.setAutoDelay(0); // Ultra-low latency execution
             robot.setAutoWaitForIdle(false); // Eliminate OS event pump blocking
-            screenDimension = Toolkit.getDefaultToolkit().getScreenSize();
-        } catch (AWTException e) {
+
+            // Safe multi-monitor / High-DPI dimension retrieval
+            try {
+                GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+                DisplayMode dm = gd.getDisplayMode();
+                screenDimension = new Dimension(dm.getWidth(), dm.getHeight());
+            } catch (Exception ignored) {
+                screenDimension = Toolkit.getDefaultToolkit().getScreenSize();
+            }
+            if (screenDimension == null || screenDimension.width <= 0 || screenDimension.height <= 0) {
+                screenDimension = Toolkit.getDefaultToolkit().getScreenSize();
+            }
+        } catch (Throwable t) {
+            logCrash("Failed to initialize Java AWT Robot engine", t);
             JOptionPane.showMessageDialog(null,
-                    "Failed to initialize Java AWT Robot engine: " + e.getMessage(),
+                    "Failed to initialize Java AWT Robot engine:\n" + t.getMessage() +
+                    "\n\nNote: NetDesk Client requires desktop display access (cannot run in headless environments).",
                     "Hardware Initialization Error", JOptionPane.ERROR_MESSAGE);
             System.exit(1);
         }
@@ -455,6 +468,8 @@ public class ClientApp extends JFrame {
             }
         } catch (IOException e) {
             // Disconnection
+        } catch (Exception e) {
+            logCrash("Chat receiver exception", e);
         } finally {
             sessionLatch.countDown();
         }
@@ -521,7 +536,19 @@ public class ClientApp extends JFrame {
                 long frameStart = System.currentTimeMillis();
 
                 // 1. Capture screen surface using Robot
-                BufferedImage screenshot = robot.createScreenCapture(captureRect);
+                BufferedImage screenshot = null;
+                try {
+                    screenshot = robot.createScreenCapture(captureRect);
+                } catch (Exception captureEx) {
+                    screenshot = createPlaceholderFrame(captureRect.width, captureRect.height,
+                            "Desktop Surface Temporarily Unavailable",
+                            "Screen is locked or inaccessible by OS.");
+                }
+                if (screenshot == null) {
+                    screenshot = createPlaceholderFrame(captureRect.width, captureRect.height,
+                            "Desktop Capture Paused",
+                            "Frame buffer returned empty.");
+                }
 
                 // 2. High-speed in-memory compression without SPI lookup overhead
                 baos.reset();
@@ -551,6 +578,8 @@ public class ClientApp extends JFrame {
         } catch (InterruptedException ignored) {
         } catch (IOException e) {
             // Disconnection
+        } catch (Exception e) {
+            logCrash("Screen streamer exception", e);
         } finally {
             sessionLatch.countDown();
         }
@@ -568,6 +597,8 @@ public class ClientApp extends JFrame {
             }
         } catch (IOException e) {
             // Disconnection
+        } catch (Exception e) {
+            logCrash("Remote execution engine exception", e);
         } finally {
             sessionLatch.countDown();
         }
@@ -848,16 +879,55 @@ public class ClientApp extends JFrame {
     }
 
     // =========================================================================
+    // CRASH REPORTING & DIAGNOSTICS ENGINE
+    // =========================================================================
+    public static void logCrash(String context, Throwable t) {
+        try (PrintWriter pw = new PrintWriter(new FileWriter("netdesk_crash.log", true))) {
+            pw.println("==================================================");
+            pw.println("NETDESK CRASH REPORT - " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+            pw.println("Role: Client Station (ClientApp)");
+            pw.println("Context: " + context);
+            pw.println("Java Version: " + System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")");
+            pw.println("OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version") + " (" + System.getProperty("os.arch") + ")");
+            pw.println("Exception: " + t.toString());
+            t.printStackTrace(pw);
+            pw.println("==================================================");
+            pw.println();
+        } catch (Exception ignored) {}
+    }
+
+    // =========================================================================
     // MAIN LAUNCHER
     // =========================================================================
     public static void main(String[] args) {
+        // Register Global Uncaught Exception Handler
+        Thread.setDefaultUncaughtExceptionHandler((t, ex) -> {
+            logCrash("Uncaught exception in thread [" + t.getName() + "]", ex);
+            SwingUtilities.invokeLater(() -> {
+                JOptionPane.showMessageDialog(null,
+                        "An unexpected error occurred in NetDesk Client:\n" + ex.toString() +
+                        "\n\nDetails have been logged to 'netdesk_crash.log'.",
+                        "NetDesk Client Error", JOptionPane.ERROR_MESSAGE);
+            });
+        });
+
+        // Apply system-native or clean cross-platform look and feel
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception ignored) {}
 
         SwingUtilities.invokeLater(() -> {
-            ClientApp client = new ClientApp();
-            client.setVisible(true);
+            try {
+                ClientApp client = new ClientApp();
+                client.setVisible(true);
+            } catch (Throwable t) {
+                logCrash("Fatal startup error in ClientApp", t);
+                JOptionPane.showMessageDialog(null,
+                        "Failed to start NetDesk Client:\n" + t.toString() +
+                        "\n\nDetails saved to 'netdesk_crash.log'.",
+                        "Startup Error", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
         });
     }
 }
