@@ -1,4 +1,9 @@
-# Virtual Machine Crash Logs
+# Byte-compiled / Object files
+*.class
+
+# Package Files
+*.jar
+*.war
 *.nar
 *.ear
 *.zip
@@ -8,6 +13,7 @@
 # Virtual Machine Crash Logs
 hs_err_pid*
 replay_pid*
+netdesk_crash.log
 
 # IDE & Editor files
 .idea/

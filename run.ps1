@@ -81,7 +81,7 @@ try {
 }
 Write-Host ""
 
-# Step 2: Check Java Environment
+# Step 2: Check Java & JDK Environment
 Write-Host "[2/3] Verifying Java Environment..." -ForegroundColor White
 $javacPath = Get-JavacExecutable
 $javaOk = $false
@@ -94,15 +94,15 @@ try {
     $javaOk = $false
 }
 
-if (-not $javaOk) {
-    Write-Host "[!] Java runtime not found on this machine." -ForegroundColor Yellow
-    Write-Host "[i] Automatically installing OpenJDK 17 via winget..." -ForegroundColor Cyan
+if (-not $javaOk -or -not $javacPath) {
+    Write-Host "[!] Java Development Kit (JDK) compiler not detected." -ForegroundColor Yellow
+    Write-Host "[i] Automatically installing Microsoft OpenJDK 17 via winget..." -ForegroundColor Cyan
     try {
         winget install Microsoft.OpenJDK.17 --accept-package-agreements --accept-source-agreements --silent
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
         $javacPath = Get-JavacExecutable
     } catch {
-        Write-Host "[X] Automatic installation failed. Please install Java (JDK 8+) from https://adoptium.net" -ForegroundColor Red
+        Write-Host "[X] Automatic installation failed. Please install JDK 17+ from https://adoptium.net" -ForegroundColor Red
         Write-Host "Press any key to exit..." -ForegroundColor Gray
         $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         exit 1
@@ -112,7 +112,7 @@ if (-not $javaOk) {
 Write-Host "[OK] Java Environment Ready." -ForegroundColor Green
 Write-Host ""
 
-# Step 3: Smart Zero-Failure Compilation & Binary Readiness
+# Step 3: Fast Background Compilation
 function Ensure-NetDeskCompiled {
     $hasClasses = (Test-Path "ServerApp.class") -and (Test-Path "ClientApp.class")
     $needsCompile = $false
@@ -132,51 +132,20 @@ function Ensure-NetDeskCompiled {
     }
 
     if ($needsCompile) {
-        $javac = Get-JavacExecutable
-        if ($javac) {
-            Write-Host "[i] Compiling components (Universal Java 8+ Bytecode)..." -ForegroundColor Cyan
-            $compileErr = javac --release 8 -Xlint:-options ServerApp.java ClientApp.java 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                $compileErr = javac ServerApp.java ClientApp.java 2>&1
-            }
-
-            if ($LASTEXITCODE -eq 0 -and (Test-Path "ServerApp.class")) {
-                Write-Host "[OK] Components compiled successfully." -ForegroundColor Green
-                return
-            } else {
-                Write-Host "[!] Compilation warning / notice:" -ForegroundColor Yellow
-                Write-Host "$compileErr" -ForegroundColor Gray
-            }
+        Write-Host "[i] Compiling components (Universal Java 8+ Bytecode)..." -ForegroundColor Cyan
+        $compileErr = javac --release 8 -Xlint:-options ServerApp.java ClientApp.java 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $compileErr = javac ServerApp.java ClientApp.java 2>&1
         }
 
-        # If javac is missing on this machine, verify if pre-compiled .class files exist
-        if ($hasClasses) {
-            Write-Host "[OK] Pre-compiled universal binaries ready." -ForegroundColor Green
+        if ($LASTEXITCODE -eq 0 -and (Test-Path "ServerApp.class")) {
+            Write-Host "[OK] Components compiled successfully." -ForegroundColor Green
             return
+        } else {
+            Write-Host "[X] Compilation failed:" -ForegroundColor Red
+            Write-Host "$compileErr" -ForegroundColor Gray
+            Read-Host "Press Enter to return to menu..."
         }
-
-        # If classes do not exist and no compiler, retrieve universal binary package from GitHub
-        Write-Host "[!] Pre-compiled classes missing and JDK compiler not found." -ForegroundColor Yellow
-        Write-Host "[i] Fetching universal binary package from GitHub..." -ForegroundColor Cyan
-        try {
-            $zipUrl = "https://github.com/M-Owais-Arshad/Zeta-NetDesk/archive/refs/heads/main.zip"
-            $zipPath = Join-Path (Get-Location).Path "netdesk_bin.zip"
-            Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 10
-            Expand-Archive -Path $zipPath -DestinationPath "temp_unzip" -Force
-            Copy-Item -Path "temp_unzip\Zeta-NetDesk-main\*.class" -Destination "." -Force -ErrorAction SilentlyContinue
-            Copy-Item -Path "temp_unzip\Zeta-NetDesk-main\*.java" -Destination "." -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path "temp_unzip" -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
-            if (Test-Path "ServerApp.class") {
-                Write-Host "[OK] Universal binaries successfully retrieved." -ForegroundColor Green
-                return
-            }
-        } catch {
-            Write-Host "[X] Binary download failed: $_" -ForegroundColor Red
-        }
-
-        Write-Host "[X] Unable to prepare binaries. Please install JDK from https://adoptium.net" -ForegroundColor Red
-        Read-Host "Press Enter to return to menu..."
     }
 }
 
